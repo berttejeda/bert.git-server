@@ -41,7 +41,7 @@ app_config = AppConfig().initialize(
   verify_tls=verify_tls
 )
 
-git_search_paths = args.repo_search_paths or app_config.get('search_paths', default_repo_search_paths)
+git_search_paths = args.repo_search_paths or app_config.get('app.search_paths', default_repo_search_paths)
 git_repo_map = {}
 
 for git_search_path in git_search_paths:
