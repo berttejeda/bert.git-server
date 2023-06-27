@@ -29,7 +29,7 @@ logger_obj = Logger(
     logfile_write_mode=args.logfile_write_mode)
 logger = logger_obj.init_logger('app')
 
-verify_tls = args.no_verify_tls or app_config.get('verify_tls', default_verify_tls)
+verify_tls = args.no_verify_tls or default_verify_tls
 
 # Flask
 app = Flask(__name__)
