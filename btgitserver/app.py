@@ -29,7 +29,7 @@ logger_obj = Logger(
     logfile_write_mode=args.logfile_write_mode)
 logger = logger_obj.init_logger('app')
 
-verify_tls = args.no_verify_tls or default_verify_tls
+verify_tls = args.no_verify_tls or app_config.get('verify_tls', default_verify_tls)
 
 # Flask
 app = Flask(__name__)
@@ -41,9 +41,8 @@ app_config = AppConfig().initialize(
   verify_tls=verify_tls
 )
 
-git_search_paths = args.repo_search_paths or default_repo_search_paths
+git_search_paths = args.repo_search_paths or app_config.get('search_paths', default_repo_search_paths)
 git_repo_map = {}
-
 
 for git_search_path in git_search_paths:
   fq_git_search_path = Path(git_search_path).expanduser()
@@ -66,9 +65,7 @@ available_repos = list(git_repo_map.keys())
 
 def start_api():
   """API functions.
-
   This function defines the API routes and starts the API Process.
-
   """
 
   @auth.get_password
