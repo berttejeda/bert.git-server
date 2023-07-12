@@ -54,7 +54,7 @@ for git_search_path in git_search_paths:
         git_directory_name = p.parent.name
         if git_directory_name:
           git_repo_map[git_directory_name] = git_directory
-  logger.info(f'Finished building git repo map!')
+logger.info(f'Finished building git repo map!')
 
 numrepos = len(list(git_repo_map.keys()))
 logger.info(f'Found {numrepos} repo(s)')
