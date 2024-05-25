@@ -10,6 +10,7 @@ default_app_port = 5000
 default_config_file_name = 'config.yaml'
 default_app_host_address = '0.0.0.0'
 default_repo_search_paths = ['~/repos']
+default_ondemand_repo_search_paths = ['~/repos.ondemand']
 default_num_workers = 4
 default_settings = {
   "auth": {
@@ -24,6 +25,9 @@ default_settings = {
     "listen": default_app_host_address,
     "port": default_app_port,
     "search_paths": default_repo_search_paths,
+    "ondemand": {
+      "search_paths": default_ondemand_repo_search_paths
+    },
     "workers": default_num_workers
   }
 }

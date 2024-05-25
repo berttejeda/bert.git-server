@@ -47,6 +47,7 @@ def parse_args(**kwargs):
     parser.add_argument('--no-verify-tls', '-notls',action='store_true', help='Verify SSL cert when downloading web content')
     parser.add_argument('--config-file', '-f', help="Path to config file override")
     parser.add_argument('--repo-search-paths', '-r', nargs='+', help="List of directories containing git repositories")
+    parser.add_argument('--ondemand-repo-search-paths', '-odr', nargs='+', help="List of directories containing on-demand git repositories")
     parser.add_argument('--logfile-path', '-L', help="Path to logfile")
     parser.add_argument('--logfile-write-mode', '-Lw', default='w', choices=['a', 'w'], help="File mode when writing to log file, 'a' to append, 'w' to overwrite")    
     parser.add_argument('--debug', action='store_true')
