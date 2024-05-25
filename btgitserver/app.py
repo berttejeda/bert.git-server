@@ -102,18 +102,23 @@ def start_api():
       else:
           try:
               ondemand_search_path = random.choice(git_ondemand_search_paths)
-              ondemand_project_path = Path(ondemand_search_path).expanduser().joinpath(project_name).as_posix()
+              ondemand_org_path = Path(ondemand_search_path).expanduser().joinpath(org_name)
+              if not ondemand_org_path.is_dir():
+                logger.info(f'Creating org path at {ondemand_org_path}')
+                ondemand_org_path.mkdir(parents=True)
+              ondemand_project_path = ondemand_org_path.joinpath(project_name).as_posix()
               project_repo = repo.Repo.init(ondemand_project_path, mkdir=True)
               project_repo_config = project_repo.get_config()
               project_repo_config.set("receive", "denyCurrentBranch", "updateInstead")
               project_repo_config.write_to_path()
-              git_repo_map = get_repos(git_search_paths)
+              git_repo_map = get_repos(org_name, git_search_paths)
               return info_refs_header(
                   git_repo_map=git_repo_map,
                   project_name=project_name,
                   service=service
               )
           except Exception as e:
+            logger.error(f"Could not create on-demand project path at {ondemand_project_path}, error was {e}")
             abort(501)
 
   def info_refs_header(**kwargs):
