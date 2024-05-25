@@ -57,8 +57,8 @@ def get_repos(org, search_paths):
 
     for git_search_path in search_paths:
         fq_git_search_path = Path(git_search_path).expanduser().joinpath(org)
-        logger.info(f'Building git repo map ...')
-        logger.info(f'Adding git repos under {fq_git_search_path}')
+        logger.debug(f'Building git repo map ...')
+        logger.debug(f'Adding git repos under {fq_git_search_path}')
         for p in Path(fq_git_search_path).glob("*"):
             dotgit = Path(p).joinpath(".git")
             if dotgit.is_dir():
@@ -66,7 +66,7 @@ def get_repos(org, search_paths):
                 git_directory_name = p.name
                 if git_directory_name:
                     repo_map[git_directory_name] = git_directory
-    logger.info(f'Finished building git repo map!')
+    logger.debug(f'Finished building git repo map!')
     numrepos = len(list(repo_map.keys()))
     logger.info(f'Found {numrepos} repo(s)')
     return repo_map
