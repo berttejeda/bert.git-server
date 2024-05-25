@@ -22,16 +22,20 @@ To get usage information and help: `git-server -h`
 
 ### Clone paths
 
-There are two routes accepted by the script:
+These are the routes accepted by the script:
 
-- '/example/<project name>'
-- '/<project name>'
+- '/<org_name>/<project_name>'
 
-All resolve to the same underlying repository path.
+These routes mirror the directory structure under the git search path(s).
 
-This effectively allows you to mock organizational structures.
+### Authentication
+  
+For now, the only authentication available is HTTP AUTH BASIC
 
-TODO: Define additional routes dynamically as opposed to hard-coding.
+As such, the default credentials are:
+
+Username: git-user
+Password: git-password
 
 ### Usage Examples
 
@@ -40,8 +44,8 @@ Quick test:
 * Create a test repo:
 
 ```
-mkdir -p /tmp/repos/test
-cd /tmp/repos/test
+mkdir -p /tmp/repos/contoso/test
+cd /tmp/repos/contoso/test
 git init .
 touch test_file.txt
 git add .
@@ -68,6 +72,5 @@ Try cloning the repo you just created via the supported routes:
 e.g.
 	
 ```bash
-git clone http://127.0.0.1:5000/test.git
-git clone http://127.0.0.1:5000/example/test.git
+git clone http://git-user:git-password@127.0.0.1:5000/contoso/test
 ```

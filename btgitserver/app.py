@@ -52,17 +52,18 @@ git_search_paths = git_search_paths + git_ondemand_search_paths
 authorized_users = app_config.auth.users
 users = [u[0] for u in authorized_users.items()]
 
-def get_repos(search_paths):
+def get_repos(org, search_paths):
     repo_map = {}
 
     for git_search_path in search_paths:
-        fq_git_search_path = Path(git_search_path).expanduser()
+        fq_git_search_path = Path(git_search_path).expanduser().joinpath(org)
         logger.info(f'Building git repo map ...')
         logger.info(f'Adding git repos under {fq_git_search_path}')
-        for p in Path(fq_git_search_path).rglob("*"):
-            if p.is_dir() and p.name == '.git':
-                git_directory = p.parent.as_posix()
-                git_directory_name = p.parent.name
+        for p in Path(fq_git_search_path).glob("*"):
+            dotgit = Path(p).joinpath(".git")
+            if dotgit.is_dir():
+                git_directory = p.as_posix()
+                git_directory_name = p.name
                 if git_directory_name:
                     repo_map[git_directory_name] = git_directory
     logger.info(f'Finished building git repo map!')
@@ -83,11 +84,10 @@ def start_api():
       else:
           return None
 
-  @app.route('/example/<string:project_name>/info/refs')
-  @app.route('/<string:project_name>/info/refs')
+  @app.route('/<string:org_name>/<string:project_name>/info/refs')
   @auth.login_required
-  def info_refs(project_name):
-      git_repo_map = get_repos(git_search_paths)
+  def info_refs(org_name, project_name):
+      git_repo_map = get_repos(org_name, git_search_paths)
       available_repos = list(git_repo_map.keys())
       service = request.args.get('service')
       if service[:4] != 'git-':
@@ -140,11 +140,10 @@ def start_api():
     p.wait()
     return res
 
-  @app.route('/example/<string:project_name>/git-receive-pack', methods=('POST',))
-  @app.route('/<string:project_name>/git-receive-pack', methods=('POST',))
+  @app.route('/<string:org_name>/<string:project_name>/git-receive-pack', methods=('POST',))
   @auth.login_required
-  def git_receive_pack(project_name):
-      git_repo_map = get_repos(git_search_paths)
+  def git_receive_pack(org_name, project_name):
+      git_repo_map = get_repos(org_name, git_search_paths)
       available_repos = list(git_repo_map.keys())
       if project_name in available_repos:
           project_path = [v for k,v in git_repo_map.items() if k == project_name][0]
@@ -172,11 +171,10 @@ def start_api():
       else:
           abort(501)
 
-  @app.route('/example/<string:project_name>/git-upload-pack', methods=('POST',))
-  @app.route('/<string:project_name>/git-upload-pack', methods=('POST',))
+  @app.route('/<string:org_name>/<string:project_name>/git-upload-pack', methods=('POST',))
   @auth.login_required
-  def git_upload_pack(project_name):
-      git_repo_map = get_repos(git_search_paths)
+  def git_upload_pack(org_name, project_name):
+      git_repo_map = get_repos(org_name, git_search_paths)
       available_repos = list(git_repo_map.keys())
       if project_name in available_repos:
           project_path = [v for k,v in git_repo_map.items() if k == project_name][0]
