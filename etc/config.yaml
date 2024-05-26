@@ -1,12 +1,13 @@
+app:
+  debug: false
+  listen: "0.0.0.0"
+  port: 5000
+  search_paths:
+    - ~/repos
+  ondemand:
+    search_paths:
+      - ~/repos.ondemand
 auth:
   users:
     git-user:
-      password: git-password
-
-app:
-  debug: false
-  address: "0.0.0.0"
-  port: 5000
-  search_paths: 
-    - ~/repos
-  verify_tls: true
+      password: git-password  
