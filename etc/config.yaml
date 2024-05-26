@@ -3,10 +3,12 @@ app:
   listen: "0.0.0.0"
   port: 5000
   search_paths:
-    - ~/repos
+    - ~/git-server/repos
+    - /opt/git-server/repos
   ondemand:
     search_paths:
-      - ~/repos.ondemand
+      - ~/git-server/repos.ondemand
+      - /opt/git-server/repos.ondemand
 auth:
   users:
     git-user:

@@ -92,3 +92,16 @@ git add .
 git commit -m 'Initial Commit'
 git push --set-upstream origin $(git rev-parse --abbrev-ref HEAD)
 ```
+
+## Docker
+
+For your convenience, a [Dockerfile](Dockerfile) has been provided,
+so feel free to build your own containerized instance of this app, or
+use the pre-built docker image:
+
+```bash
+mkdir /tmp/repos
+docker run -it --rm -p 5000:5000 \
+-v /tmp/repos:/opt/git-server/repos \
+berttejeda/git-server
+```

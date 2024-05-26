@@ -1,27 +1,20 @@
-FROM python:2.7-alpine as base
-FROM base as builder
+# syntax=docker/dockerfile:1
+FROM --platform=linux/amd64 python:3.9.12 as builder
+ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apk add --no-cache git make musl-dev gcc
+RUN apt update -y
 
-RUN mkdir -p /app/lib
-RUN mkdir -p /app/repos
+RUN apt install -y git
 
-WORKDIR /app
-
-ADD config.ini .
-ADD requirements.txt .
-ADD git-server.py .
-
-RUN pip install -t /app/lib -r /app/requirements.txt
-
-FROM base
-
-RUN pip install gunicorn
-
-# copy from builder
-COPY --from=builder /app /app
+RUN mkdir -p /app/repos /etc/git-server
 
 WORKDIR /app
 
-ENTRYPOINT [ "/app/git-server.py" ]
-CMD []
+ADD etc/config.yaml /etc/git-server/config.yaml
+
+RUN pip install btgitserver
+
+WORKDIR /app
+
+ENTRYPOINT [ "bt.git-server" ]
+CMD ["-f", "/etc/git-server/config.yaml"]
