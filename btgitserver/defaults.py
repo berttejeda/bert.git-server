@@ -11,7 +11,7 @@ default_config_file_name = 'config.yaml'
 default_app_host_address = '0.0.0.0'
 default_repo_search_paths = ['~/repos']
 default_ondemand_repo_search_paths = ['~/repos.ondemand']
-default_num_workers = 4
+default_num_workers = 4 # not yet implemented
 default_settings = {
   "auth": {
     "users": {
