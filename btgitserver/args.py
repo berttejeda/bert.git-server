@@ -52,7 +52,7 @@ def parse_args(**kwargs):
     parser.add_argument('--logfile-path', '-L', help="Path to logfile")
     parser.add_argument('--logfile-write-mode', '-Lw', default='w', choices=['a', 'w'], help="File mode when writing to log file, 'a' to append, 'w' to overwrite")    
     parser.add_argument('--debug', action='store_true')
-    parser.add_argument('--version', action='version', version=f'{__version__}')
+    parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}')
     parser.add_argument(
         "-v",
         "--verbose",
