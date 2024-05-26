@@ -19,7 +19,7 @@ Features:
 
 ## Usage
 
-To get usage information and help: `git-server -h`
+To get usage information and help: `bt.git-server -h`
 
 ### Clone paths
 
@@ -54,15 +54,15 @@ touch test_file.txt
 git add .
 git commit -m 'Initial Commit'
 cd ~
-git-server -r /tmp/repos
+bt.git-server -r /tmp/repos
 ```
 
 **Note**: The `--repo-search-paths/-r` cli option allows specifying 
-multiple, space-delimitted search paths, e.g. `git-server -r /tmp/repos /tmp/repos2`
+multiple, space-delimitted search paths, e.g. `bt.git-server -r /tmp/repos /tmp/repos2`
 
 * Launch the standalone git server
 
-`git-server`
+`bt.git-server`
 
 You should see output similar to:
 ```
