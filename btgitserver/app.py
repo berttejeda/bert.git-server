@@ -28,6 +28,7 @@ __original_author = 'stewartpark'
 
 # Read command-line args
 args = parse_args()
+
 # Initialize logging facility
 logger_obj = Logger(
     logfile_path=args.logfile_path,
