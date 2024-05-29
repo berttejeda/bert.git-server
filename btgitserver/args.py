@@ -1,7 +1,7 @@
 import argparse
 from argparse import RawTextHelpFormatter
 from btgitserver import __version__
-from btgitserver.defaults import app_name
+from btgitserver.defaults import app_name, default_app_port, default_app_host_address
 
 def parse_args(**kwargs):
     parser = argparse.ArgumentParser(
@@ -33,11 +33,12 @@ def parse_args(**kwargs):
     parser.add_argument(
         "-host",
         "--host-address",
+        default=default_app_host_address,
         help="Override listening address",
         metavar="ARG", required=False)
     parser.add_argument(
         "-p",
-        "--port",
+        "--port", default=default_app_port,
         help="Override listening port",
         metavar="ARG", required=False)
     parser.add_argument(
@@ -50,13 +51,18 @@ def parse_args(**kwargs):
     parser.add_argument('--repo-search-paths', '-r', nargs='+', help="List of directories containing git repositories")
     parser.add_argument('--ondemand-repo-search-paths', '-odr', nargs='+', help="List of directories containing on-demand git repositories")
     parser.add_argument('--logfile-path', '-L', help="Path to logfile")
-    parser.add_argument('--logfile-write-mode', '-Lw', default='w', choices=['a', 'w'], help="File mode when writing to log file, 'a' to append, 'w' to overwrite")    
+    parser.add_argument('--threads', '-t', default=8, help="Number of concurrent threads")
+    parser.add_argument('--timeout', '-T', default=0, help="Timeout")
+    parser.add_argument('--num-workers', type=int, default=5, help="Number of worker processes")
+    parser.add_argument('--logfile-write-mode', '-Lw', default='w', choices=['a', 'w'], help="File mode when writing to log file, 'a' to append, 'w' to overwrite")
+    parser.add_argument('--preload', action='store_true', help="Load application code before the worker processes are forked")
     parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--dev-server', action='store_true', help="Start app in Flask dev server mode")
     parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}')
     parser.add_argument(
         "-v",
         "--verbose",
         help="increase output verbosity",
         action="store_true")
-    
-    return parser.parse_args()
+    args, unknown = parser.parse_known_args()
+    return args

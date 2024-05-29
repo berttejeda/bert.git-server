@@ -1,3 +1,5 @@
+import atexit
+import gunicorn.app.base
 import random
 import sys
 import subprocess
@@ -22,6 +24,7 @@ if sys.version_info[0] == 2:
 if sys.version_info[0] >= 3:
     from io import BytesIO
 
+
 # Private variables
 __author__ = 'berttejeda'
 __original_author = 'stewartpark'
@@ -38,7 +41,6 @@ logger = logger_obj.init_logger('app')
 verify_tls = args.no_verify_tls or default_verify_tls
 
 # Flask
-app = Flask(__name__)
 auth = HTTPBasicAuth()
 
 # Initialize Config Readers
@@ -52,6 +54,22 @@ git_search_paths = args.repo_search_paths or app_config.get('app.search_paths', 
 git_search_paths = git_search_paths + git_ondemand_search_paths
 authorized_users = app_config.auth.users
 users = [u[0] for u in authorized_users.items()]
+
+class StandaloneApplication(gunicorn.app.base.BaseApplication):
+
+    def __init__(self, app, options=None):
+        self.options = options or {}
+        self.application = app
+        super().__init__()
+
+    def load_config(self):
+        config = {key: value for key, value in self.options.items()
+                  if key in self.cfg.settings and value is not None}
+        for key, value in config.items():
+            self.cfg.set(key.lower(), value)
+
+    def load(self):
+        return self.application
 
 def get_repos(org, search_paths):
     repo_map = {}
@@ -69,13 +87,20 @@ def get_repos(org, search_paths):
                     repo_map[git_directory_name] = git_directory
     logger.debug(f'Finished building git repo map!')
     numrepos = len(list(repo_map.keys()))
-    logger.info(f'Found {numrepos} repo(s)')
+    logger.debug(f'Found {numrepos} repo(s)')
     return repo_map
 
-def start_api():
+
+def interrupt():
+  logger.info("Stop API")
+
+def start_api(**kwargs):
   """API functions.
   This function defines the API routes and starts the API Process.
   """
+  app = Flask(__name__)
+  # app.config['MAX_CONTENT_LENGTH'] = 1600 * 1024 * 1024 # 16GB
+  # app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024 # 16MB
 
   @auth.get_password
   def get_pw(username):
@@ -94,6 +119,8 @@ def start_api():
       if service[:4] != 'git-':
           abort(500)
 
+      logger.info(f'Receiving {org_name}/{project_name}')
+      
       if project_name in available_repos:
           return info_refs_header(
               git_repo_map=git_repo_map,
@@ -101,17 +128,20 @@ def start_api():
               service=service
           )
       else:
+          logger.info(f'Repo at {org_name}/{project_name} does not currently exist, processing as on-demand')
           try:
               ondemand_search_path = random.choice(git_ondemand_search_paths)
               ondemand_org_path = Path(ondemand_search_path).expanduser().joinpath(org_name)
               if not ondemand_org_path.is_dir():
-                logger.info(f'Creating org path at {ondemand_org_path}')
+                logger.info(f'Creating on-demand repo org path at {ondemand_org_path}')
                 ondemand_org_path.mkdir(parents=True)
               ondemand_project_path = ondemand_org_path.joinpath(project_name).as_posix()
+              logger.info(f'Initializing on-demand repo {ondemand_project_path}')
               project_repo = repo.Repo.init(ondemand_project_path, mkdir=True)
               project_repo_config = project_repo.get_config()
               project_repo_config.set("receive", "denyCurrentBranch", "updateInstead")
               project_repo_config.write_to_path()
+              logger.info(f'Initialization complete for {ondemand_project_path}')
               git_repo_map = get_repos(org_name, git_search_paths)
               return info_refs_header(
                   git_repo_map=git_repo_map,
@@ -173,6 +203,7 @@ def start_api():
           res.headers['Cache-Control'] = 'no-cache, max-age=0, must-revalidate'
           res.headers['Content-Type'] = 'application/x-git-receive-pack-result'
           p.wait()
+          logger.info(f'Finished receiving {org_name}/{project_name}')
           return res
       else:
           abort(501)
@@ -201,19 +232,20 @@ def start_api():
 
   logger.info("Start API")
 
-  app_port = args.port or app_config.get('app.port') or default_app_port
-  app_host_address = args.host_address or app_config.get('app.address') or default_app_host_address
-  app.run(host=app_host_address, port=app_port)
+  options = {
+      'bind': f'{args.host_address}:{args.port}',
+      'preload': args.preload,
+      'workers': args.workers,
+      'threads': args.threads,
+  }
 
-  logger.info("Stop API")
-
-def main():
-  """The main entrypoint
-  """
-
-  start_api()
+  atexit.register(interrupt)
+  if args.dev_server:
+    app_port = args.port or app_config.get('app.port') or default_app_port
+    app_host_address = args.host_address or app_config.get('app.address') or default_app_host_address
+    app.run(host=app_host_address, port=app_port)
+  else:
+    StandaloneApplication(app, options).run()    
 
 if __name__ == '__main__':
-  main()
-
-
+  start_api()
