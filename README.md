@@ -11,6 +11,7 @@ Features:
 - Application defaults can be overridden by specifying a configuration file<br />
   Review [etc/config.yaml](etc/config.yaml) for a sample data structure.
 - On-demand repos: If you attempt to push a non-existing repo to the server, it will be created 
+- Employs process threading via [gunicorn](https://gunicorn.org/)
 
 ## Installation
 
@@ -58,7 +59,7 @@ bt.git-server -r /tmp/repos
 ```
 
 **Note**: The `--repo-search-paths/-r` cli option allows specifying 
-multiple, space-delimitted search paths, e.g. `bt.git-server -r /tmp/repos /tmp/repos2`
+multiple, space-delimited search paths, e.g. `bt.git-server -r /tmp/repos /tmp/repos2`
 
 * Launch the standalone git server
 
