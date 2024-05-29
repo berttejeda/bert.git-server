@@ -8,13 +8,18 @@ RUN apt install -y git
 
 RUN mkdir -p /app/repos /etc/git-server
 
+
+WORKDIR /setup
+
+ADD . .
+
+RUN pip install .
+
 WORKDIR /app
 
 ADD etc/config.yaml /etc/git-server/config.yaml
 
-RUN pip install btgitserver
-
-WORKDIR /app
+RUN rm -rf /setup
 
 ENTRYPOINT [ "bt.git-server" ]
 CMD ["-f", "/etc/git-server/config.yaml"]
