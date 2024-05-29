@@ -1,7 +1,7 @@
 import argparse
 from argparse import RawTextHelpFormatter
 from btgitserver import __version__
-from btgitserver.defaults import app_name, default_app_port, default_app_host_address
+from btgitserver.defaults import app_name
 
 def parse_args(**kwargs):
     parser = argparse.ArgumentParser(
@@ -33,12 +33,11 @@ def parse_args(**kwargs):
     parser.add_argument(
         "-host",
         "--host-address",
-        default=default_app_host_address,
         help="Override listening address",
         metavar="ARG", required=False)
     parser.add_argument(
         "-p",
-        "--port", default=default_app_port,
+        "--port",
         help="Override listening port",
         metavar="ARG", required=False)
     parser.add_argument(

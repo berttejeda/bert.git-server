@@ -6,8 +6,12 @@ import subprocess
 
 from btgitserver.args import parse_args
 from btgitserver.config import AppConfig
-from btgitserver.defaults import default_app_port, \
+from btgitserver.defaults import \
 default_app_host_address, \
+default_app_port, \
+default_num_threads, \
+default_num_workers, \
+default_preload, \
 default_repo_search_paths, \
 default_ondemand_repo_search_paths, \
 default_verify_tls
@@ -52,8 +56,15 @@ app_config = AppConfig().initialize(
 git_ondemand_search_paths = args.ondemand_repo_search_paths or app_config.get('app.ondemand.search_paths', default_ondemand_repo_search_paths)
 git_search_paths = args.repo_search_paths or app_config.get('app.search_paths', default_repo_search_paths)
 git_search_paths = git_search_paths + git_ondemand_search_paths
+app_host_address = args.host_address or app_config.get('app.listen', default_app_host_address)
+app_port = args.port or app_config.get('app.port', default_app_port)
+gunicorn_preload = args.preload or app_config.get('app.gunicorn.preload', default_preload)
+gunicorn_threads = args.threads or app_config.get('app.gunicorn.threads', default_num_threads)
+gunicorn_workers = args.workers or app_config.get('app.gunicorn.workers', default_num_workers)
+
 authorized_users = app_config.auth.users
 users = [u[0] for u in authorized_users.items()]
+
 
 class StandaloneApplication(gunicorn.app.base.BaseApplication):
 
@@ -129,12 +140,12 @@ def start_api(**kwargs):
           )
       else:
           logger.info(f'Repo at {org_name}/{project_name} does not currently exist, processing as on-demand')
+          ondemand_search_path = random.choice(git_ondemand_search_paths)
+          ondemand_org_path = Path(ondemand_search_path).expanduser().joinpath(org_name)
           try:
-              ondemand_search_path = random.choice(git_ondemand_search_paths)
-              ondemand_org_path = Path(ondemand_search_path).expanduser().joinpath(org_name)
               if not ondemand_org_path.is_dir():
-                logger.info(f'Creating on-demand repo org path at {ondemand_org_path}')
-                ondemand_org_path.mkdir(parents=True)
+                  logger.info(f'Creating on-demand repo org path at {ondemand_org_path}')
+                  ondemand_org_path.mkdir(parents=True)
               ondemand_project_path = ondemand_org_path.joinpath(project_name).as_posix()
               logger.info(f'Initializing on-demand repo {ondemand_project_path}')
               project_repo = repo.Repo.init(ondemand_project_path, mkdir=True)
@@ -149,8 +160,8 @@ def start_api(**kwargs):
                   service=service
               )
           except Exception as e:
-            logger.error(f"Could not create on-demand project path at {ondemand_project_path}, error was {e}")
-            abort(501)
+              logger.error(f"Could not create on-demand project path at {ondemand_project_path}, error was {e}")
+              abort(501)
 
   def info_refs_header(**kwargs):
     git_repo_map = kwargs['git_repo_map']
@@ -233,16 +244,14 @@ def start_api(**kwargs):
   logger.info("Start API")
 
   options = {
-      'bind': f'{args.host_address}:{args.port}',
-      'preload': args.preload,
-      'workers': args.workers,
-      'threads': args.threads,
+      'bind': f'{app_host_address}:{app_port}',
+      'preload': gunicorn_preload,
+      'threads': gunicorn_threads,
+      'workers': gunicorn_workers,
   }
 
   atexit.register(interrupt)
   if args.dev_server:
-    app_port = args.port or app_config.get('app.port') or default_app_port
-    app_host_address = args.host_address or app_config.get('app.address') or default_app_host_address
     app.run(host=app_host_address, port=app_port)
   else:
     StandaloneApplication(app, options).run()    

@@ -31,6 +31,7 @@ class AppConfig():
         default_value=default_settings,
         initial_data=initial_data,
         args=args,
+        warn_if_config_not_found=True,
         verify_tls=verify_tls
     )
 

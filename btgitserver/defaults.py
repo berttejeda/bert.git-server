@@ -9,9 +9,11 @@ app_name = "Python Git Server"
 default_app_port = 5000
 default_config_file_name = 'config.yaml'
 default_app_host_address = '0.0.0.0'
-default_repo_search_paths = ['~/repos']
-default_ondemand_repo_search_paths = ['~/repos.ondemand']
-default_num_workers = 4 # not yet implemented
+default_repo_search_paths = ['~/git-server/repos']
+default_ondemand_repo_search_paths = ['~/git-server/repos.ondemand']
+default_num_workers = 4
+default_num_threads = 8
+default_preload = True
 default_settings = {
   "auth": {
     "users": {
@@ -28,6 +30,10 @@ default_settings = {
     "ondemand": {
       "search_paths": default_ondemand_repo_search_paths
     },
-    "workers": default_num_workers
+    "gunicorn": {
+      "workers": default_num_workers, 
+      "threads": default_num_threads, 
+      "preload": default_preload
+    }
   }
 }

@@ -4,11 +4,13 @@ app:
   port: 5000
   search_paths:
     - ~/git-server/repos
-    - /opt/git-server/repos
   ondemand:
     search_paths:
       - ~/git-server/repos.ondemand
-      - /opt/git-server/repos.ondemand
+  gunicorn:
+    workers: 4
+    threads: 8
+    preload: True
 auth:
   users:
     git-user:
