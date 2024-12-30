@@ -16,7 +16,7 @@ Features:
 ## Installation
 
 - Install from pypi.org: `pip install btgitserver`
-- Install directly from git repo: `pip install git+http://www.github.com/berttejeda/bert.gt-server.git`
+- Install directly from git repo: `pip install git+http://www.github.com/berttejeda/bert.git-server.git`
 
 ## Usage
 
