@@ -17,6 +17,7 @@ default_ondemand_repo_search_paths, \
 default_verify_tls
 from btgitserver.logger import Logger
 
+from hashlib import sha1
 from dulwich import repo
 from dulwich.pack import PackStreamReader
 from flask_httpauth import HTTPBasicAuth
@@ -133,6 +134,21 @@ def start_api(**kwargs):
       logger.info(f'Receiving {org_name}/{project_name}')
       
       if project_name in available_repos:
+          # Ensure receive.denyCurrentBranch is set to updateInstead for existing repos
+          project_path = git_repo_map[project_name]
+          try:
+              project_repo = repo.Repo(project_path)
+              project_repo_config = project_repo.get_config()
+              try:
+                  current_value = project_repo_config.get("receive", "denyCurrentBranch")
+              except KeyError:
+                  current_value = None
+              if current_value not in (b"updateInstead", "updateInstead"):
+                  logger.info(f'Setting receive.denyCurrentBranch to updateInstead for {project_path}')
+                  project_repo_config.set("receive", "denyCurrentBranch", "updateInstead")
+                  project_repo_config.write_to_path()
+          except Exception as e:
+              logger.warning(f'Could not set receive.denyCurrentBranch for {project_path}: {e}')
           return info_refs_header(
               git_repo_map=git_repo_map,
               project_name=project_name,
@@ -199,9 +215,11 @@ def start_api(**kwargs):
           pack_file = data_in[data_in.index(b'PACK'):]
 
           if sys.version_info[0] == 2:
-              objects = PackStreamReader(StringIO(pack_file).read)
+              pack_file_io = StringIO(pack_file)
+              objects = PackStreamReader(sha1, pack_file_io.read, pack_file_io.read)
           if sys.version_info[0] >= 3:
-              objects = PackStreamReader(BytesIO(pack_file).read)
+              pack_file_io = BytesIO(pack_file)
+              objects = PackStreamReader(sha1, pack_file_io.read, pack_file_io.read)
 
           for obj in objects.read_objects():
               if obj.obj_type_num == 1: # Commit
