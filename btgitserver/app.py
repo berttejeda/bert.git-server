@@ -1,6 +1,9 @@
 import atexit
+import gzip
 import gunicorn.app.base
+import logging
 import random
+import re
 import sys
 import subprocess
 
@@ -24,10 +27,7 @@ from flask_httpauth import HTTPBasicAuth
 from flask import Flask, make_response, request, abort
 from pathlib import Path
 
-if sys.version_info[0] == 2:
-    from StringIO import StringIO
-if sys.version_info[0] >= 3:
-    from io import BytesIO
+from io import BytesIO
 
 
 # Private variables
@@ -66,6 +66,9 @@ gunicorn_workers = args.workers or app_config.get('app.gunicorn.workers', defaul
 authorized_users = app_config.auth.users
 users = [u[0] for u in authorized_users.items()]
 
+allowed_services = ('git-upload-pack', 'git-receive-pack')
+valid_name_pattern = re.compile(r'^[A-Za-z0-9_-][A-Za-z0-9._-]*$')
+
 
 class StandaloneApplication(gunicorn.app.base.BaseApplication):
 
@@ -103,6 +106,36 @@ def get_repos(org, search_paths):
     return repo_map
 
 
+def fix_dangling_head(project_path):
+    """Point HEAD at an existing branch if it refers to one that doesn't exist.
+
+    New repos are initialized with HEAD -> refs/heads/master, so a first push
+    of e.g. 'main' would otherwise leave clones with nothing to check out.
+    """
+    try:
+        project_repo = repo.Repo(project_path)
+        _, head_sha = project_repo.refs.follow(b'HEAD')
+        if head_sha is not None:
+            return
+        branches = project_repo.refs.keys(base=b'refs/heads/')
+        if not branches:
+            return
+        for preferred in (b'main', b'master'):
+            if preferred in branches:
+                branch = preferred
+                break
+        else:
+            branch = sorted(branches)[0]
+        logger.info(f'Pointing HEAD at refs/heads/{branch.decode()} for {project_path}')
+        project_repo.refs.set_symbolic_ref(b'HEAD', b'refs/heads/' + branch)
+        if not project_repo.bare:
+            # Sync the (previously unborn) index and working tree with the new
+            # HEAD, otherwise updateInstead rejects the next push to it
+            subprocess.run(['git', 'reset', '--hard', '-q'], cwd=project_path, check=True)
+    except Exception as e:
+        logger.warning(f'Could not update HEAD for {project_path}: {e}')
+
+
 def interrupt():
   logger.info("Stop API")
 
@@ -122,14 +155,22 @@ def start_api(**kwargs):
       else:
           return None
 
+  @app.before_request
+  def validate_path_names():
+      # Reject org/project names that could escape the repo search paths
+      # (e.g. "..") or that aren't plain directory names
+      for name in (request.view_args or {}).values():
+          if not valid_name_pattern.match(name):
+              abort(400)
+
   @app.route('/<string:org_name>/<string:project_name>/info/refs')
   @auth.login_required
   def info_refs(org_name, project_name):
       git_repo_map = get_repos(org_name, git_search_paths)
       available_repos = list(git_repo_map.keys())
       service = request.args.get('service')
-      if service[:4] != 'git-':
-          abort(500)
+      if service not in allowed_services:
+          abort(400)
 
       logger.info(f'Receiving {org_name}/{project_name}')
       
@@ -154,30 +195,33 @@ def start_api(**kwargs):
               project_name=project_name,
               service=service
           )
+      elif service != 'git-receive-pack':
+          # Only a push may create a repo; fetches/clones of unknown repos are a 404
+          abort(404)
       else:
           logger.info(f'Repo at {org_name}/{project_name} does not currently exist, processing as on-demand')
           ondemand_search_path = random.choice(git_ondemand_search_paths)
           ondemand_org_path = Path(ondemand_search_path).expanduser().joinpath(org_name)
+          ondemand_project_path = ondemand_org_path.joinpath(project_name).as_posix()
           try:
               if not ondemand_org_path.is_dir():
                   logger.info(f'Creating on-demand repo org path at {ondemand_org_path}')
                   ondemand_org_path.mkdir(parents=True)
-              ondemand_project_path = ondemand_org_path.joinpath(project_name).as_posix()
               logger.info(f'Initializing on-demand repo {ondemand_project_path}')
               project_repo = repo.Repo.init(ondemand_project_path, mkdir=True)
               project_repo_config = project_repo.get_config()
               project_repo_config.set("receive", "denyCurrentBranch", "updateInstead")
               project_repo_config.write_to_path()
               logger.info(f'Initialization complete for {ondemand_project_path}')
-              git_repo_map = get_repos(org_name, git_search_paths)
-              return info_refs_header(
-                  git_repo_map=git_repo_map,
-                  project_name=project_name,
-                  service=service
-              )
           except Exception as e:
               logger.error(f"Could not create on-demand project path at {ondemand_project_path}, error was {e}")
-              abort(501)
+              abort(500)
+          git_repo_map = get_repos(org_name, git_search_paths)
+          return info_refs_header(
+              git_repo_map=git_repo_map,
+              project_name=project_name,
+              service=service
+          )
 
   def info_refs_header(**kwargs):
     git_repo_map = kwargs['git_repo_map']
@@ -203,6 +247,13 @@ def start_api(**kwargs):
     p.wait()
     return res
 
+  def get_request_body():
+    # git gzips larger upload-pack (fetch) requests
+    data = request.get_data()
+    if request.headers.get('Content-Encoding') == 'gzip':
+        data = gzip.decompress(data)
+    return data
+
   @app.route('/<string:org_name>/<string:project_name>/git-receive-pack', methods=('POST',))
   @auth.login_required
   def git_receive_pack(org_name, project_name):
@@ -211,31 +262,32 @@ def start_api(**kwargs):
       if project_name in available_repos:
           project_path = [v for k,v in git_repo_map.items() if k == project_name][0]
           p = subprocess.Popen(['git-receive-pack', '--stateless-rpc', project_path], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-          data_in = request.data
-          pack_file = data_in[data_in.index(b'PACK'):]
-
-          if sys.version_info[0] == 2:
-              pack_file_io = StringIO(pack_file)
-              objects = PackStreamReader(sha1, pack_file_io.read, pack_file_io.read)
-          if sys.version_info[0] >= 3:
-              pack_file_io = BytesIO(pack_file)
-              objects = PackStreamReader(sha1, pack_file_io.read, pack_file_io.read)
-
-          for obj in objects.read_objects():
-              if obj.obj_type_num == 1: # Commit
-                  logger.debug(obj)
-          p.stdin.write(data_in)
-          data_out = p.communicate()
+          data_in = get_request_body()
+          # Not every receive-pack request carries a pack: git sends a bare
+          # flush-pkt ("0000") probe before a large (chunked) push, and
+          # delete-only pushes have no pack either.
+          pack_start = data_in.find(b'PACK')
+          if pack_start != -1 and logger.isEnabledFor(logging.DEBUG):
+              try:
+                  pack_file_io = BytesIO(data_in[pack_start:])
+                  objects = PackStreamReader(sha1, pack_file_io.read, pack_file_io.read)
+                  for obj in objects.read_objects():
+                      if obj.obj_type_num == 1: # Commit
+                          logger.debug(obj)
+              except Exception as e:
+                  logger.debug(f'Could not parse pack for logging: {e}')
+          data_out, _ = p.communicate(input=data_in)
           res = make_response(data_out)
           res.headers['Expires'] = 'Fri, 01 Jan 1980 00:00:00 GMT'
           res.headers['Pragma'] = 'no-cache'
           res.headers['Cache-Control'] = 'no-cache, max-age=0, must-revalidate'
           res.headers['Content-Type'] = 'application/x-git-receive-pack-result'
           p.wait()
+          fix_dangling_head(project_path)
           logger.info(f'Finished receiving {org_name}/{project_name}')
           return res
       else:
-          abort(501)
+          abort(404)
 
   @app.route('/<string:org_name>/<string:project_name>/git-upload-pack', methods=('POST',))
   @auth.login_required
@@ -246,9 +298,7 @@ def start_api(**kwargs):
           project_path = [v for k,v in git_repo_map.items() if k == project_name][0]
           p = subprocess.Popen(['git-upload-pack', '--stateless-rpc', project_path],
                                stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-          p.stdin.write(request.data)
-          p.stdin.close()
-          data = p.stdout.read()
+          data, _ = p.communicate(input=get_request_body())
           res = make_response(data)
           res.headers['Expires'] = 'Fri, 01 Jan 1980 00:00:00 GMT'
           res.headers['Pragma'] = 'no-cache'
@@ -257,7 +307,7 @@ def start_api(**kwargs):
           p.wait()
           return res
       else:
-          abort(501)
+          abort(404)
 
   logger.info("Start API")
 
